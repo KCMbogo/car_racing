@@ -4,6 +4,7 @@ import random
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
+GREY = (100, 100, 100)
 
 pygame.init()
 pygame.font.init()
@@ -11,14 +12,15 @@ pygame.font.init()
 text_font = pygame.font.SysFont("Comic Sans MS", 40)
 
 clock = pygame.time.Clock()
-size = width, height = 512, 600
+size = width, height = 700, 680
+road_width = 512
 screen = pygame.display.set_mode(size)
 
 pygame.display.set_caption("MBOGO'S DODGE CAR)")
 
 road_speed = 1
 road = pygame.image.load("image/road1.jpg")
-road = pygame.transform.scale(road, (width, height))
+road = pygame.transform.scale(road, (road_width, height))
 
 # Road background positioning for scrolling
 road_y1 = 0
@@ -35,7 +37,7 @@ player_car = pygame.transform.scale(player_car, (car_width, car_height))
 player_car = pygame.transform.rotate(player_car, 90)
 car_x = (width / 2) - (car_width / 2)
 car_y = height - car_height - 20
-car_speed = 3
+car_speed = 2
 
 # opposing cars
 opposing_car_images = [
@@ -43,7 +45,7 @@ opposing_car_images = [
     pygame.transform.rotate(pygame.transform.scale(pygame.image.load("image/truck.png"), (truck_width, truck_height)), -90),
     pygame.transform.rotate(pygame.transform.scale(pygame.image.load("image/car1.svg"), (van_width, van_height)), -90),
 ]
-opposing_car_speed = 3 
+opposing_car_speed = 2 
 num_opposing_cars = 5  
 
 opposing_cars = []
@@ -58,13 +60,31 @@ def can_spawn_in_lane(lane_x, min_gap):
             return False
     return True
 
-running = True
-game_over = False
 crash_sound = pygame.mixer.Sound("sound/crush.flac")
 game_sound = pygame.mixer.Sound("sound/game.ogg")
 game_sound.play(-1)
 crash_sound_played = False
+
+# score
+score = 0
+
+running = True
+game_over = False
+start_time = pygame.time.get_ticks()
+last_elapsed_time = 0
+
 while running:
+    if not game_over:
+        elapsed_time = pygame.time.get_ticks() - start_time
+        elapsed_time_to_sec = elapsed_time / 1000
+        
+        if elapsed_time_to_sec - last_elapsed_time >= 5:
+            car_speed += 1
+            opposing_car_speed += 1
+            road_speed += .5
+            score += 5
+            last_elapsed_time = elapsed_time_to_sec
+        
     pressed = pygame.key.get_pressed()
     
     for event in pygame.event.get():
@@ -77,11 +97,11 @@ while running:
             car_y -= car_speed  
         if pressed[pygame.K_DOWN] and car_y < height - car_height - 20:
             car_y += car_speed 
-        if pressed[pygame.K_RIGHT] and car_x < width - car_width:
+        if pressed[pygame.K_RIGHT] and car_x < road_width - car_width:
             car_x += car_speed 
-        if pressed[pygame.K_LEFT] and car_x > 0:
+        if pressed[pygame.K_LEFT] and car_x > 20:
             car_x -= car_speed 
-    
+
     # Check each lane if we can spawn a new car with proper spacing
     for lane_x in lane_positions:
         if can_spawn_in_lane(lane_x, min_gap):
@@ -113,7 +133,7 @@ while running:
                 crash_sound_played = True
         
         # Remove and respawn the car once it goes off the bottom of the screen
-        if car[1] > height:#
+        if car[1] > height:#WHITE
             opposing_cars.remove(car)   
             # Respawn in a new random lane with a gap
             new_lane = random.choice(lane_positions)
@@ -123,32 +143,43 @@ while running:
                     new_car_image = random.choice(opposing_car_images)
                     opposing_cars.append([new_lane, new_opposing_y, new_car_image])
     
-    # Move the road to create scrolling effect
+    # Move the road to create scrolling effectWHITE
     road_y1 += road_speed
     road_y2 += road_speed     
     
     # Reset the road position once it scrolls completely
     if road_y1 >= height:
-        road_y1 = -height
+        road_y1 = road_y2 - height 
     if road_y2 >= height:
-        road_y2 = -height
+        road_y2 = road_y1 - height
+    
+    score_value = text_font.render("Your score:" + "\n" + str(score), True, WHITE)
+    score_text = text_font.render("Your Score:", True, WHITE)
+    scored_value = text_font.render(str(score), True, WHITE)
     
     if game_over == False:
-        screen.fill(BLACK)
+        screen.fill(GREY)
+        
         screen.blit(road, (0, road_y1))
         screen.blit(road, (0, road_y2))
         screen.blit(player_car, (car_x, car_y))
         
         for car in opposing_cars:
             screen.blit(car[2], (car[0], car[1]))  
+            
+        screen.blit(score_text, (road_width + 2, 10)) 
+        screen.blit(scored_value, (road_width + (width - road_width) / 2, 50)) 
+           
     else:
-        text_game_over = text_font.render("GAME OVER", False, BLACK)
-        options = text_font.render("Press ENTER to play or ESC to quit", False, BLACK)
+        text_game_over = text_font.render("GAME OVER", True, BLACK)
+        options = text_font.render("Press ENTER to play or ESC to quit", True, BLACK)
         
         text_game_over_rect = text_game_over.get_rect(center=(width / 2, height / 2 - 20))
         options_rect = options.get_rect(center=(width / 2, height / 2 + 20))
+        score_rect = score_value.get_rect(center=(width / 2, height / 2 +60))
         screen.blit(text_game_over, text_game_over_rect)
         screen.blit(options, options_rect)
+        screen.blit(score_value, score_rect)
         
         if pressed[pygame.K_RETURN]:
             crash_sound_played = False
@@ -156,6 +187,8 @@ while running:
             car_x = (width / 2) - (car_width / 2)
             car_y = height - car_height - 20
             opposing_cars = []
+            car_speed, opposing_car_speed = 2, 2
+            road_speed = 1
             game_sound.play(-1)
         elif pressed[pygame.K_ESCAPE]:
             running = False
